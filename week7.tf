@@ -9,11 +9,12 @@ resource "google_dns_managed_zone" "default" {
   dns_name    = "week7challenge.tk."
   description = "Week 7 DNS"
 
+  visibility = "public"
 }
 
 # reserved IP address
 resource "google_compute_global_address" "default" {
-  name = "load-balancer-ip"
+  name         = "load-balancer-ip"
   address_type = "EXTERNAL"
 }
 
@@ -24,7 +25,7 @@ resource "google_dns_record_set" "frontend" {
 
   managed_zone = google_dns_managed_zone.default.name
 
-  rrdatas = ["week7challenge.tk."]
+  rrdatas = [google_dns_managed_zone.default.dns_name]
 }
 
 resource "google_dns_record_set" "kubernetes" {
@@ -50,7 +51,6 @@ resource "google_dns_record_set" "default" {
 # forwarding rule
 resource "google_compute_global_forwarding_rule" "default" {
   name                  = "load-balancer-fowarding"
-  ip_protocol           = "HTTP2"
   load_balancing_scheme = "EXTERNAL"
   port_range            = "80"
   target                = google_compute_target_http_proxy.default.id
@@ -59,8 +59,8 @@ resource "google_compute_global_forwarding_rule" "default" {
 
 # http proxy
 resource "google_compute_target_http_proxy" "default" {
-  name     = "load-balancer-http-proxy"
-  url_map  = google_compute_url_map.default.id
+  name    = "load-balancer-http-proxy"
+  url_map = google_compute_url_map.default.id
 }
 
 # url map
@@ -71,12 +71,12 @@ resource "google_compute_url_map" "default" {
 
 # backend service with custom request and response headers
 resource "google_compute_backend_service" "default" {
-  name                     = "load-balancer-backend-service"
-  protocol                 = "HTTP2"
-  port_name                = "customhttp"
-  load_balancing_scheme    = "EXTERNAL"
-  timeout_sec              = 10
-  health_checks            = [google_compute_health_check.http-health-check.id]
+  name                  = "load-balancer-backend-service"
+  protocol              = "HTTP"
+  port_name             = "customhttp"
+  load_balancing_scheme = "EXTERNAL"
+  timeout_sec           = 10
+  health_checks         = [google_compute_health_check.http-health-check.id]
   backend {
     group           = google_compute_instance_group_manager.default.instance_group
     balancing_mode  = "UTILIZATION"
@@ -170,5 +170,45 @@ resource "google_compute_health_check" "http-health-check" {
   }
 }
 
+resource "google_service_account" "default" {
+  account_id   = "service-account-id"
+  display_name = "Service Account Kubernetes"
+}
 
+resource "google_container_cluster" "primary" {
+  name = "my-gke-cluster"
+
+  remove_default_node_pool = true
+  initial_node_count       = 1
+
+  release_channel {
+    channel = "REGULAR"
+  }
+}
+
+data "google_container_engine_versions" "default" {
+  version_prefix = "1.24."
+}
+
+output "stable_channel_version" {
+  value = data.google_container_engine_versions.default.release_channel_default_version["STABLE"]
+}
+
+resource "google_container_node_pool" "primary_preemptible_nodes" {
+  name       = "my-node-pool"
+  cluster    = google_container_cluster.primary.name
+  node_count = 1
+  version    = data.google_container_engine_versions.default.release_channel_default_version["STABLE"]
+
+  node_config {
+    preemptible  = true
+    machine_type = "e2-small"
+
+    # Google recommends custom service accounts that have cloud-platform scope and permissions granted via IAM Roles.
+    service_account = google_service_account.default.email
+    oauth_scopes = [
+      "https://www.googleapis.com/auth/cloud-platform"
+    ]
+  }
+}
 
