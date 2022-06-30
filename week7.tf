@@ -197,7 +197,7 @@ output "stable_channel_version" {
 resource "google_container_node_pool" "primary_preemptible_nodes" {
   name       = "my-node-pool"
   cluster    = google_container_cluster.primary.name
-  node_count = 1
+  node_count = 2
   version    = data.google_container_engine_versions.default.release_channel_default_version["STABLE"]
 
   node_config {
