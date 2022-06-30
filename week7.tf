@@ -11,6 +11,12 @@ resource "google_dns_managed_zone" "default" {
 
 }
 
+# reserved IP address
+resource "google_compute_global_address" "default" {
+  name = "load-balancer-ip"
+  address_type = "EXTERNAL"
+}
+
 resource "google_dns_record_set" "frontend" {
   name = "www.${google_dns_managed_zone.default.dns_name}"
   type = "CNAME"
@@ -38,7 +44,44 @@ resource "google_dns_record_set" "default" {
 
   managed_zone = google_dns_managed_zone.default.name
 
-  rrdatas = ["8.8.8.8"] //google_compute_instance.frontend.network_interface[0].access_config[0].nat_ip
+  rrdatas = [google_compute_global_address.default.address] //google_compute_instance.frontend.network_interface[0].access_config[0].nat_ip
+}
+
+# forwarding rule
+resource "google_compute_global_forwarding_rule" "default" {
+  name                  = "load-balancer-fowarding"
+  ip_protocol           = "HTTP2"
+  load_balancing_scheme = "EXTERNAL"
+  port_range            = "80"
+  target                = google_compute_target_http_proxy.default.id
+  ip_address            = google_compute_global_address.default.id
+}
+
+# http proxy
+resource "google_compute_target_http_proxy" "default" {
+  name     = "load-balancer-http-proxy"
+  url_map  = google_compute_url_map.default.id
+}
+
+# url map
+resource "google_compute_url_map" "default" {
+  name            = "load-balancer-url-map"
+  default_service = google_compute_backend_service.default.id
+}
+
+# backend service with custom request and response headers
+resource "google_compute_backend_service" "default" {
+  name                     = "load-balancer-backend-service"
+  protocol                 = "HTTP2"
+  port_name                = "customhttp"
+  load_balancing_scheme    = "EXTERNAL"
+  timeout_sec              = 10
+  health_checks            = [google_compute_health_check.http-health-check.id]
+  backend {
+    group           = google_compute_instance_group_manager.default.instance_group
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
 }
 
 resource "google_compute_autoscaler" "default" {
