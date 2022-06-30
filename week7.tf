@@ -61,7 +61,7 @@ resource "google_compute_instance_template" "default" {
   name         = "generic-week7"
   machine_type = "e2-small"
 
-  tags = ["http-server","https-server", "web"]
+  tags = ["http-server", "https-server"]
 
   disk {
     source_image = "base-image"
@@ -127,19 +127,5 @@ resource "google_compute_health_check" "http-health-check" {
   }
 }
 
-resource "google_compute_firewall" "default" {
-  name    = "test-firewall"
-  network = "default"
-
-  allow {
-    protocol = "icmp"
-  }
-
-  allow {
-    protocol = "tcp"
-    ports    = ["80", "8080", "443", "22", "3389"]
-  }
-  source_ranges = ["0.0.0.0"]
-}
 
 
