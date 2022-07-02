@@ -18,6 +18,18 @@ resource "google_compute_global_address" "default" {
   address_type = "EXTERNAL"
 }
 
+# reserved IP address
+resource "google_compute_global_address" "docker" {
+  name         = "docker-ip"
+  address_type = "EXTERNAL"
+}
+
+# reserved IP address
+resource "google_compute_global_address" "guestbook" {
+  name         = "guestbook-ip"
+  address_type = "EXTERNAL"
+}
+
 resource "google_dns_record_set" "frontend" {
   name = "www.${google_dns_managed_zone.default.dns_name}"
   type = "CNAME"
@@ -35,7 +47,17 @@ resource "google_dns_record_set" "kubernetes" {
 
   managed_zone = google_dns_managed_zone.default.name
 
-  rrdatas = ["8.8.8.8"] //google_compute_instance.frontend.network_interface[0].access_config[0].nat_ip
+  rrdatas = [google_compute_global_address.docker.address] //google_compute_instance.frontend.network_interface[0].access_config[0].nat_ip
+}
+
+resource "google_dns_record_set" "guestbook" {
+  name = "guestbook.${google_dns_managed_zone.default.dns_name}"
+  type = "A"
+  ttl  = 300
+
+  managed_zone = google_dns_managed_zone.default.name
+
+  rrdatas = [google_compute_global_address.guestbook.address] //google_compute_instance.frontend.network_interface[0].access_config[0].nat_ip
 }
 
 resource "google_dns_record_set" "default" {
@@ -52,21 +74,44 @@ resource "google_dns_record_set" "default" {
 resource "google_compute_global_forwarding_rule" "default" {
   name                  = "load-balancer-fowarding"
   load_balancing_scheme = "EXTERNAL"
-  port_range            = "80"
-  target                = google_compute_target_http_proxy.default.id
+  port_range            = "443"
+  target                = google_compute_target_https_proxy.https.id
   ip_address            = google_compute_global_address.default.id
 }
 
-# http proxy
-resource "google_compute_target_http_proxy" "default" {
-  name    = "load-balancer-http-proxy"
-  url_map = google_compute_url_map.default.id
+resource "google_compute_managed_ssl_certificate" "default" {
+  name = "default-cert"
+
+  managed {
+    domains = [google_dns_managed_zone.default.dns_name]
+  }
+}
+
+resource "google_compute_target_https_proxy" "https" {
+  name             = "load-balancer-https-proxy"
+  url_map          = google_compute_url_map.default.id
+  ssl_certificates = [google_compute_managed_ssl_certificate.default.id]
 }
 
 # url map
 resource "google_compute_url_map" "default" {
   name            = "load-balancer-url-map"
   default_service = google_compute_backend_service.default.id
+
+  host_rule {
+    hosts        = [google_dns_managed_zone.default.dns_name]
+    path_matcher = "allpaths"
+  }
+
+  path_matcher {
+    name            = "allpaths"
+    default_service = google_compute_backend_service.default.id
+
+    path_rule {
+      paths   = ["/*"]
+      service = google_compute_backend_service.default.id
+    }
+  }
 }
 
 # backend service with custom request and response headers

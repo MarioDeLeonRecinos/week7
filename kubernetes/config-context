@@ -1,0 +1,5 @@
+gke_week7-354615_us-west1-c_my-gke-cluster
+
+kubectl config set-context guestbook --namespace=guestbook --cluster=gke_week7-354615_us-west1-c_my-gke-cluster --user=gke_week7-354615_us-west1-c_my-gke-cluster
+
+kubectl config set-context docker --namespace=docker --cluster=gke_week7-354615_us-west1-c_my-gke-cluster --user=gke_week7-354615_us-west1-c_my-gke-cluster

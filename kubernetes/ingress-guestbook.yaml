@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: guestbook-ip
+    # If the class annotation is not specified it defaults to "gce".
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: managed-cert
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend-svc
+            port:
+              number: 443

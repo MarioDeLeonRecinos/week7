@@ -3,22 +3,13 @@ kind: Ingress
 metadata:
   name: my-ingress
   annotations:
+    kubernetes.io/ingress.global-static-ip-name: docker-ip
     # If the class annotation is not specified it defaults to "gce".
     kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: managed-cert
 spec:
   rules:
-  - host: "kubernetes.week7challenge.tk"
-    http:
-      paths:
-      - path: /*
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: frontend-svc 
-            port:
-              number: 80
-  - host: "kubernetes.week7challenge.tk"
-    http:
+  - http:
       paths:
       - path: /*
         pathType: ImplementationSpecific
@@ -26,4 +17,4 @@ spec:
           service:
             name: building-apps-svc
             port:
-              number: 80
+              number: 443
